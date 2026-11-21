@@ -3859,8 +3859,8 @@ function _renderLvLyrics() {
 
 /* ── Secondary Lyrics(배경 보컬) — 기본 가사 아래 작은 글씨 ──────────────
    구조: wrap > main / (번역) / .np-lv-sec(높이 박스) > .np-lv-sec-in > .np-lv-sec-txt (+ .np-lv-sec-tr)
-   · 공간(박스 높이)은 "현재 줄 + 다음 줄"만 열어 둔다 → 이전 줄이 활성일 때부터 다음 가사와의 간격이 미리 벌어져 있다.
-   · 내용(.sec-show)은 그 줄이 활성이 되는 순간에만 나타난다. 줄을 벗어나면 내용이 사라지고 공간이 닫힌다.
+   · 공간(박스 높이)은 그 줄이 활성이 되는 순간 줄 이동 스프링과 함께 열리고, 내용(.sec-show)은 조금 뒤 부드럽게 떠오른다.
+   · 줄을 벗어나면 내용이 먼저 사라지고 공간이 이어서 닫힌다.
    · 높이는 px 로 명시해 CSS transition 으로만 움직인다(JS 프레임 루프 없음). */
 function _buildLvSec(line, wrap) {
     const bg = line.bg;
@@ -3884,19 +3884,19 @@ function _lvSecSet(i, open, show) {
     if (show !== bg.show) { bg.show = show; line.el_lv_wrap.classList.toggle('sec-show', show); }
     if (open !== bg.open) {
         bg.open = open;
+        line.el_lv_wrap.classList.toggle('sec-open', open);
         bg.fh = open ? bg.inn.offsetHeight : 0;
         bg.box.style.height = bg.fh + 'px';
         LV.anim.add(i);
     }
 }
 
-/* 현재 줄 + 다음 줄(Secondary 가 있는 줄만)의 공간을 열고, 나머지는 닫는다 */
+/* 현재 줄(Secondary 가 있을 때)의 공간을 열고, 나머지는 닫는다 */
 function _lvSecUpdate(idx) {
     const L = LY.lines;
     const want = [];
     if (idx >= 0) {
-        if (L[idx] && L[idx].bg) want.push(idx);
-        if (L[idx + 1] && L[idx + 1].bg) want.push(idx + 1);
+        if (L[idx] && L[idx].bg) want.push(idx);   // 그 줄이 활성이 되는 순간에만 공간을 연다 (미리 벌려 두지 않음)
     }
     for (const i of LV.open) {
         if (want.indexOf(i) < 0) { _lvSecSet(i, false, false); LV.open.delete(i); }
