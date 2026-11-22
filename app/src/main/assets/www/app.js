@@ -3778,7 +3778,7 @@ const LV_UI_IDLE_MS = 3500;      // 이 시간 동안 상호작용이 없으면 
 
 /* ── 재생 UI(재생바/재생·일시정지/이전·다음) 자동 숨김 ──────────────────
    · 숨김/표시는 #np-lv 의 .ui-hide 클래스 하나로 처리 (opacity/transform 전환만 — 레이아웃 변화 없음)
-   · 다시 나타나는 제스처: 위로 스크롤(위쪽으로 28px 이상 끌어올림). 아래로 끄는 동작은 제스처로 보지 않는다.
+   · 다시 나타나는 제스처: 위로 스크롤(손가락을 위쪽으로 18px 이상). 반대(아래) 방향 드래그는 제스처로 보지 않는다.
    · 컨트롤을 만지고 있는 동안(재생바 드래그 포함)은 숨기지 않고, 손을 뗀 뒤부터 다시 센다. */
 function _lvUiArm() {
     clearTimeout(LV.uiTimer);
@@ -3797,7 +3797,8 @@ function _lvUiInit() {
     if (!root || root._uiInit) return;
     root._uiInit = true;
     const bottom = root.querySelector('.np-lv-bottom');
-    const SWIPE_UP = 28;                 // px — 이만큼 위로 끌어올리면 "위로 스크롤 제스처"
+    const SWIPE_MIN = 18;                // px — 이만큼 움직여야 제스처로 인정
+    const SWIPE_DIR = -1;                // -1: 손가락이 화면 위쪽으로 움직임(위로 스크롤)에 반응 / 1 로 바꾸면 아래로 움직임에 반응
     let sx = 0, sy = 0, tracking = false, fired = false;
     const begin = (x, y, target) => {
         sx = x; sy = y; tracking = true; fired = false;
@@ -3807,8 +3808,8 @@ function _lvUiInit() {
     };
     const move = (x, y) => {
         if (!tracking || fired) return;
-        const dy = y - sy, dx = x - sx;
-        if (-dy >= SWIPE_UP && -dy > Math.abs(dx) * 1.2) {          // 위쪽으로, 세로 성분이 뚜렷할 때만 (아래로 끄는 동작은 무시)
+        const dy = (y - sy) * SWIPE_DIR, dx = x - sx;                // dy > 0 이 "반응할 방향"
+        if (dy >= SWIPE_MIN && dy > Math.abs(dx) * 1.2) {            // 세로 성분이 뚜렷할 때만, 반대 방향 드래그는 무시
             fired = true;
             _lvUiShow();
         }
