@@ -3454,7 +3454,7 @@ function _applyLineSpread(key, idx, spread) {
    전혀 건드리지 않는다. 드래그 중에는 스프링을 멈추고 손가락을 1:1로
    따라가게 하다가, 손을 떼면 잠시 후 기존 하이라이트 함수를 그대로
    다시 호출해 원래 스프링 애니메이션으로 현재 재생 줄로 복귀시킨다. */
-function _attachLyricDragScroll(scrollEl, getInner, getSpring, resumeFn) {
+function _attachLyricDragScroll(scrollEl, getInner, getSpring, resumeFn, onGesture) {
     if (!scrollEl || scrollEl._dragAttached) return;
     scrollEl._dragAttached = true;
     scrollEl._browsing = false;   // 사용자가 직접 넘겨보는 중 → 재생 줄 자동 이동(스프링)을 잠시 보류
@@ -3462,7 +3462,8 @@ function _attachLyricDragScroll(scrollEl, getInner, getSpring, resumeFn) {
     const FRICTION = 0.9968;       // 관성 감속 (ms 당 속도 유지율)
     const MIN_FLING = 0.08;        // px/ms — 이보다 느리면 관성 없음
     const MAX_FLING = 6;           // px/ms
-    let dragging = false, moved = false, flinging = false;
+    let dragging = false, moved = false, flinging = false, gestured = false;
+    const GESTURE_PX = 18;         // 이만큼 끌면 방향 제스처로 통지(onGesture)
     let startY = 0, startPos = 0, pos = 0, pendingPos = null, vel = 0;
     let resumeTimer = null, dragRaf = 0, flingRaf = 0, bnd = { hi: 0, lo: 0 };
     let samples = [];
@@ -3538,6 +3539,7 @@ function _attachLyricDragScroll(scrollEl, getInner, getSpring, resumeFn) {
         const wasFling = flinging;
         stopFling();
         dragging = true;
+        gestured = false;
         moved = wasFling;               // 관성 중 터치로 멈춘 경우, 뒤따르는 탭이 seek 로 오작동하지 않게
         scrollEl._browsing = true;
         startY = y; samples = [{ t: performance.now(), y }];
@@ -3551,6 +3553,8 @@ function _attachLyricDragScroll(scrollEl, getInner, getSpring, resumeFn) {
         if (!dragging) return;
         const dy = y - startY;
         if (Math.abs(dy) > 4) moved = true;
+        /* 가사가 손가락을 따라 실제로 움직이는 방향 기준: dy < 0 = 가사가 위로 올라감(위로 스크롤), dy > 0 = 아래로 내림 */
+        if (onGesture && !gestured && Math.abs(dy) >= GESTURE_PX) { gestured = true; onGesture(dy < 0 ? 'up' : 'down'); }
         pos = rubber(startPos + dy);
         pendingPos = pos;
         if (!dragRaf) dragRaf = requestAnimationFrame(flushDrag);
@@ -3778,7 +3782,8 @@ const LV_UI_IDLE_MS = 3500;      // 이 시간 동안 상호작용이 없으면 
 
 /* ── 재생 UI(재생바/재생·일시정지/이전·다음) 자동 숨김 ──────────────────
    · 숨김/표시는 #np-lv 의 .ui-hide 클래스 하나로 처리 (opacity/transform 전환만 — 레이아웃 변화 없음)
-   · 다시 나타나는 제스처: 위로 스크롤(손가락을 위쪽으로 18px 이상). 반대(아래) 방향 드래그는 제스처로 보지 않는다.
+   · 다시 나타나는 제스처: 가사를 위로 스크롤(가사가 위로 올라가는 드래그, 18px 이상) — _attachLyricDragScroll 의 onGesture('up').
+     아래로 내리는 드래그는 제스처로 보지 않는다.
    · 컨트롤을 만지고 있는 동안(재생바 드래그 포함)은 숨기지 않고, 손을 뗀 뒤부터 다시 센다. */
 function _lvUiArm() {
     clearTimeout(LV.uiTimer);
@@ -3797,36 +3802,17 @@ function _lvUiInit() {
     if (!root || root._uiInit) return;
     root._uiInit = true;
     const bottom = root.querySelector('.np-lv-bottom');
-    const SWIPE_MIN = 18;                // px — 이만큼 움직여야 제스처로 인정
-    const SWIPE_DIR = -1;                // -1: 손가락이 화면 위쪽으로 움직임(위로 스크롤)에 반응 / 1 로 바꾸면 아래로 움직임에 반응
-    let sx = 0, sy = 0, tracking = false, fired = false;
-    const begin = (x, y, target) => {
-        sx = x; sy = y; tracking = true; fired = false;
-        if (bottom && bottom.contains(target) && !root.classList.contains('ui-hide')) {
-            LV.uiHold = true; clearTimeout(LV.uiTimer);            // 컨트롤 조작 중에는 숨기지 않음
-        }
-    };
-    const move = (x, y) => {
-        if (!tracking || fired) return;
-        const dy = (y - sy) * SWIPE_DIR, dx = x - sx;                // dy > 0 이 "반응할 방향"
-        if (dy >= SWIPE_MIN && dy > Math.abs(dx) * 1.2) {            // 세로 성분이 뚜렷할 때만, 반대 방향 드래그는 무시
-            fired = true;
-            _lvUiShow();
-        }
-    };
-    const end = () => {
-        tracking = false;
-        if (LV.uiHold) { LV.uiHold = false; _lvUiArm(); }
-    };
-    root.addEventListener('touchstart', e => begin(e.touches[0].clientX, e.touches[0].clientY, e.target), { passive: true });
-    root.addEventListener('touchmove', e => move(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-    root.addEventListener('touchend', end, { passive: true });
-    root.addEventListener('touchcancel', end, { passive: true });
-    // 마우스(PC/에뮬레이터)
-    root.addEventListener('mousedown', e => begin(e.clientX, e.clientY, e.target));
-    root.addEventListener('mousemove', e => { if (e.buttons & 1) move(e.clientX, e.clientY); });
-    root.addEventListener('mouseup', end);
-    root.addEventListener('mouseleave', end);
+    if (!bottom) return;
+    /* 컨트롤 높이를 CSS 변수로 알려 준다 → 그 구간의 가사를 가리고(마스크) 블러를 맞춘다 */
+    const setH = () => root.style.setProperty('--lv-ctrl-h', bottom.offsetHeight + 'px');
+    if (window.ResizeObserver) new ResizeObserver(setH).observe(bottom);
+    setH();
+    /* 컨트롤을 만지는 동안(재생바 드래그 포함)은 숨기지 않고, 손을 뗀 뒤부터 다시 센다 */
+    const hold = () => { if (!root.classList.contains('ui-hide')) { LV.uiHold = true; clearTimeout(LV.uiTimer); } };
+    const release = () => { if (LV.uiHold) { LV.uiHold = false; _lvUiArm(); } };
+    bottom.addEventListener('touchstart', hold, { passive: true });
+    bottom.addEventListener('mousedown', hold);
+    ['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(t => bottom.addEventListener(t, release, { passive: true }));
 }
 function _lvReset() { LV.cls = []; LV.open.clear(); LV.anim.clear(); LV.pad = -1; }
 
@@ -3914,7 +3900,8 @@ function _renderLvLyrics() {
         document.getElementById('np-lv-scroll'),
         () => document.getElementById('np-lv-inner'),
         () => LY._lvScrollSpring,
-        () => _highlightLvLine(LY.curIdx, false)
+        () => _highlightLvLine(LY.curIdx, false),
+        dir => { if (dir === 'up') _lvUiShow(); }      // 위로 스크롤할 때만 재생 UI 표시 (아래로 내리는 동작은 무시)
     );
 }
 
