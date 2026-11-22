@@ -73,11 +73,9 @@
        내용은 투명도로만 나타나고 사라지므로, 공간이 덜 열린 순간에도 눈에 보이는 겹침이 없다. */
     overflow: visible;
     contain: layout style;
-    /* 닫힘: 내용이 먼저 사라진 뒤 공간이 이어서 접힌다 */
-    transition: height 0.6s cubic-bezier(0.33, 0, 0.2, 1) 0.14s;
-}
-.np-lv-line-wrap.sec-open .np-lv-sec {
-    /* 열림: 줄 이동 스프링과 같은 박자로 바로 열린다 */
+    /* 열림/닫힘 모두 지연 없이, 줄 이동 스프링과 같은 박자로 움직인다.
+       (닫힘에 지연을 두면 스프링은 이미 "접힌 뒤" 위치로 향하는데 레이아웃만 늦게 접혀,
+        다음 줄이 한 박자 늦게 따라오는 듯 어색해진다) */
     transition: height 0.7s cubic-bezier(0.22, 0.85, 0.28, 1);
 }
 .np-lv-sec-in {
@@ -86,7 +84,7 @@
     pointer-events: none;
     transform: translate3d(0, 3px, 0);
     transition:
-        opacity 0.16s ease-out,
+        opacity 0.14s ease-out,
         transform 0.3s ease-out;
 }
 .np-lv-line-wrap.sec-show .np-lv-sec-in {
