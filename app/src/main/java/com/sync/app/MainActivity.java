@@ -154,6 +154,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_main);
+        applyImmersive();   // 앱 진입 시 안드로이드 네비게이션 바 숨김(전체화면)
         webView = findViewById(R.id.webView);
         if (webView instanceof BgWebView) bgWebView = (BgWebView) webView;
         // Liquid Glass: WebView(frontend)를 Compose backdrop 소스로 옮기고 네이티브 글래스 레이어를 얹는다.
@@ -390,16 +391,32 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> webView.evaluateJavascript(js, null));
     }
 
+    /** 가로 전체화면 중에는 상태바까지 숨기고, 세로에서는 내비게이션 바만 숨긴다. */
+    private boolean landscapeImmersive = false;
+
+    /** 창 포커스를 얻을 때마다 다시 적용 — 다른 앱/시스템 UI 를 다녀오거나 바가 일시 표시된 뒤에도 숨김 유지 */
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) applyImmersive();
+    }
+
     private void setOrientation(String mode) {
         if ("landscape".equals(mode)) {
+            landscapeImmersive = true;
             setRequestedOrientation(
                     ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
             hideSystemUI();
         } else {
+            landscapeImmersive = false;
             setRequestedOrientation(
                     ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
             showSystemUI();
         }
+    }
+
+    private void applyImmersive() {
+        if (landscapeImmersive) hideSystemUI(); else showSystemUI();
     }
 
     private void hideSystemUI() {
@@ -429,18 +446,24 @@ public class MainActivity extends AppCompatActivity {
                 getWindow().getDecorView().requestApplyInsets());
     }
 
+    /** 세로 모드: 상태바는 보이고 내비게이션 바는 숨김(스와이프로 일시 표시). */
     private void showSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController c = getWindow().getInsetsController();
-            if (c != null)
-                c.show(WindowInsets.Type.statusBars()
-                        | WindowInsets.Type.navigationBars());
+            if (c != null) {
+                c.show(WindowInsets.Type.statusBars());
+                c.hide(WindowInsets.Type.navigationBars());
+                c.setSystemBarsBehavior(
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
         } else {
             //noinspection deprecation
             getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
         }
     }
 
