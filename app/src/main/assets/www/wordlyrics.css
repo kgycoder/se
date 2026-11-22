@@ -69,10 +69,12 @@
 ════════════════════════════════════════════════════════════════════ */
 .np-lv-sec {
     height: 0;
-    overflow: hidden;
+    /* overflow 를 자르지 않는다: 높이가 자라는 동안 글자가 박스 경계에 잘려 "와이프"되던 문제 방지.
+       내용은 투명도로만 나타나고 사라지므로, 공간이 덜 열린 순간에도 눈에 보이는 겹침이 없다. */
+    overflow: visible;
     contain: layout style;
     /* 닫힘: 내용이 먼저 사라진 뒤 공간이 이어서 접힌다 */
-    transition: height 0.55s cubic-bezier(0.4, 0, 0.2, 1) 0.12s;
+    transition: height 0.6s cubic-bezier(0.33, 0, 0.2, 1) 0.14s;
 }
 .np-lv-line-wrap.sec-open .np-lv-sec {
     /* 열림: 줄 이동 스프링과 같은 박자로 바로 열린다 */
@@ -81,18 +83,20 @@
 .np-lv-sec-in {
     padding: 5px 0 1px;
     opacity: 0;
-    transform: translate3d(0, 5px, 0);
+    pointer-events: none;
+    transform: translate3d(0, 3px, 0);
     transition:
-        opacity 0.2s ease-in,
-        transform 0.35s cubic-bezier(0.4, 0, 0.6, 1);
+        opacity 0.16s ease-out,
+        transform 0.3s ease-out;
 }
 .np-lv-line-wrap.sec-show .np-lv-sec-in {
     opacity: 1;
+    pointer-events: auto;
     transform: translate3d(0, 0, 0);
-    /* 공간이 어느 정도 열린 뒤 천천히 떠오른다 */
+    /* 공간이 충분히 열린 뒤, 제자리에서 서서히 나타난다 (미끄러져 올라오지 않음) */
     transition:
-        opacity 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.22s,
-        transform 0.9s cubic-bezier(0.22, 0.85, 0.28, 1) 0.22s;
+        opacity 0.7s cubic-bezier(0.3, 0.1, 0.3, 1) 0.3s,
+        transform 0.8s cubic-bezier(0.22, 0.85, 0.28, 1) 0.3s;
 }
 
 .np-lv-sec-txt {
