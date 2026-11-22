@@ -3475,7 +3475,7 @@ function _attachLyricDragScroll(scrollEl, getInner, getSpring, resumeFn) {
     function calcBounds(inner) {
         const first = inner.firstElementChild, last = inner.lastElementChild;
         if (!first || !last) return { hi: 0, lo: 0 };
-        const half = scrollEl.clientHeight / 2;
+        const half = scrollEl.clientHeight * (scrollEl._anchor || 0.5);   // Lyrics View 는 위쪽 정렬(_anchor)
         const padTop = parseFloat(getComputedStyle(scrollEl).paddingTop) || 0;
         const a = half - padTop - (first.offsetTop + first.offsetHeight / 2);
         const b = half - padTop - (last.offsetTop + last.offsetHeight / 2);
@@ -3772,7 +3772,49 @@ function _clearLyrics() {
 ════════════════════════════════════════════ */
 /* cls: 상태 클래스(active/prev/near)가 붙어 있는 줄 인덱스 — 전체 줄을 훑지 않고 이 줄들만 되돌린다
    open: Secondary 공간이 열려 있는 줄 / anim: 공간 높이가 아직 전환 중인 줄 / pad: 스크롤 영역 padding-top 캐시 */
-const LV = { active: false, cls: [], open: new Set(), anim: new Set(), pad: -1 };
+const LV = { active: false, cls: [], open: new Set(), anim: new Set(), pad: -1, uiTimer: 0, uiHold: false };
+const LV_ANCHOR = 0.32;          // 현재 줄이 가사 영역 위에서 차지하는 세로 위치 (0.5 = 정중앙, Apple Music 처럼 위쪽 정렬)
+const LV_UI_IDLE_MS = 3500;      // 이 시간 동안 상호작용이 없으면 재생 UI 를 숨긴다
+
+/* ── 재생 UI(재생바/재생·일시정지/이전·다음) 자동 숨김 ──────────────────
+   · 숨김/표시는 #np-lv 의 .ui-hide 클래스 하나로 처리 (opacity/transform 전환만 — 레이아웃 변화 없음)
+   · 다시 나타나는 제스처: "탭"(이동 10px 이하, 0.5초 이하). 가사를 위/아래로 끄는 드래그·플링은 제스처로 보지 않는다.
+   · 컨트롤을 만지고 있는 동안(재생바 드래그 포함)은 숨기지 않고, 손을 뗀 뒤부터 다시 센다. */
+function _lvUiArm() {
+    clearTimeout(LV.uiTimer);
+    if (LV.active) LV.uiTimer = setTimeout(_lvUiHide, LV_UI_IDLE_MS);
+}
+function _lvUiHide() {
+    if (!LV.active || LV.uiHold) return;
+    document.getElementById('np-lv')?.classList.add('ui-hide');
+}
+function _lvUiShow() {
+    document.getElementById('np-lv')?.classList.remove('ui-hide');
+    _lvUiArm();
+}
+function _lvUiInit() {
+    const root = document.getElementById('np-lv');
+    if (!root || root._uiInit) return;
+    root._uiInit = true;
+    const bottom = root.querySelector('.np-lv-bottom');
+    let sx = 0, sy = 0, st = 0, tracking = false;
+    root.addEventListener('pointerdown', e => {
+        sx = e.clientX; sy = e.clientY; st = performance.now(); tracking = true;
+        if (bottom && bottom.contains(e.target) && !root.classList.contains('ui-hide')) {
+            LV.uiHold = true; clearTimeout(LV.uiTimer);          // 컨트롤 조작 중에는 숨기지 않음
+        }
+    }, { passive: true });
+    const end = (e, cancelled) => {
+        if (LV.uiHold) { LV.uiHold = false; _lvUiArm(); }
+        if (!tracking) return;
+        tracking = false;
+        if (cancelled) return;                                     // 브라우저가 제스처를 가져감(스크롤/드래그)
+        if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10 || performance.now() - st > 500) return;   // 드래그·롱프레스는 제외
+        if (root.classList.contains('ui-hide')) _lvUiShow(); else _lvUiArm();
+    };
+    root.addEventListener('pointerup', e => end(e, false), { passive: true });
+    root.addEventListener('pointercancel', e => end(e, true), { passive: true });
+}
 function _lvReset() { LV.cls = []; LV.open.clear(); LV.anim.clear(); LV.pad = -1; }
 
 function toggleLyricsView() {
@@ -3796,6 +3838,8 @@ function openLyricsView() {
     if (lvCh)    lvCh.textContent    = t?.channel || 'YouTube';
     _lvReset();
     _renderLvLyrics();
+    _lvUiInit();
+    _lvUiShow();
     requestAnimationFrame(() => { _highlightLvLine(LY.curIdx, true); });
     _translateLyricsIfNeeded();
 }
@@ -3803,6 +3847,8 @@ function openLyricsView() {
 function closeLyricsView() {
     if (!LV.active) return;
     LV.active = false;
+    clearTimeout(LV.uiTimer); LV.uiHold = false;
+    document.getElementById('np-lv')?.classList.remove('ui-hide');
     document.getElementById('np')?.classList.remove('lyrics-view');
     document.getElementById('np-lv-btn')?.classList.remove('on');
     if (LY._lvScrollSpring) LY._lvScrollSpring.stop();
@@ -3845,6 +3891,8 @@ function _renderLvLyrics() {
     inner.appendChild(frag);
     inner.appendChild(_lySrcEl());
 
+    const lvScroll = document.getElementById('np-lv-scroll');
+    if (lvScroll) lvScroll._anchor = LV_ANCHOR;
     inner.style.transform = 'translateY(0px)';
     if (LY._lvScrollSpring) LY._lvScrollSpring.stop();
     _resetSpread('el_lv_wrap');
@@ -3954,7 +4002,7 @@ function _highlightLvLine(idx, instant) {
 
     if (idx >= 0 && L[idx] && L[idx].el_lv_wrap) {
         if (LV.pad < 0) LV.pad = parseFloat(getComputedStyle(scroll).paddingTop) || 0;
-        const target = (scroll.clientHeight / 2) - LV.pad - _lvMid(idx);
+        const target = (scroll.clientHeight * LV_ANCHOR) - LV.pad - _lvMid(idx);
         if (!LY._lvScrollSpring) LY._lvScrollSpring = _makeSpring();
         const applyFrame = (pos, vel) => {
             inner.style.transform = `translateY(${pos}px)`;
