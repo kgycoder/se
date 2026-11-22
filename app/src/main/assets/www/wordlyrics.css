@@ -79,7 +79,9 @@
     transition: height 0.7s cubic-bezier(0.22, 0.85, 0.28, 1);
 }
 .np-lv-sec-in {
-    padding: 5px 0 1px;
+    /* 기본 가사(번역) ↔ Secondary 간격: 이 값만 바꾸면 된다 (위쪽 padding) */
+    --sec-gap: 9px;
+    padding: var(--sec-gap) 0 1px;
     opacity: 0;
     pointer-events: none;
     transform: translate3d(0, 3px, 0);
