@@ -143,32 +143,49 @@
 
 /* ════════════════════════════════════════════════════════════════════
    LYRICS VIEW — Apple Music 스타일 보강
-   · 재생 UI(.np-lv-bottom)는 가사 위에 겹쳐 놓는 오버레이다. 가사 영역이 화면 맨 아래까지 이어지므로
-     UI 가 숨겨졌을 때 그 자리에도 가사가 보인다.
-   · UI 뒤의 하단 어둠(글로우)은 작게: 컨트롤이 읽힐 만큼만.
+   · 재생 UI(.np-lv-bottom)는 가사 위에 겹쳐 놓는 오버레이 → UI 가 숨으면 그 자리에도 가사가 보인다.
+   · UI 가 보일 때는 그 뒤의 가사가 읽히지 않도록 블러 + 어두운 그라데이션으로 덮는다.
+   · 가사 영역 맨 아래에는 항상 약한 블러 페이드가 있다 (UI 가 숨어 있어도).
    · 숨김/표시는 opacity/transform 만 사용 (레이아웃 영향 없음). 숨김 중에는 터치를 받지 않는다.
 ════════════════════════════════════════════════════════════════════ */
 .np-lv-scroll {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 94%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 94%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 96%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 96%, transparent 100%);
+}
+/* 항상 켜져 있는 하단 블러 페이드 (아래로 갈수록 블러가 진해진다) */
+.np-lv-lyrics::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 76px;
+    z-index: 4;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 85%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 85%);
 }
 .np-lv-bottom {
     position: absolute;
     left: 0; right: 0; bottom: 0;
     z-index: 6;
-    will-change: opacity, transform;
     transition:
         opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
         transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.np-lv-bottom::before {                 /* 하단 글로우(어둠) — 작게 */
+/* UI 뒤 배경: 블러 + 어둡게 덮어 뒤의 가사가 읽히지 않게 (위쪽은 부드럽게 사라짐) */
+.np-lv-bottom::before {
     content: '';
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    top: -14px;
+    top: -34px;
     z-index: -1;
     pointer-events: none;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.26));
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.5) 34%, rgba(0, 0, 0, 0.68) 100%);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
 }
 .np-lv.ui-hide .np-lv-bottom {
     opacity: 0;
