@@ -143,27 +143,40 @@
 
 /* ════════════════════════════════════════════════════════════════════
    LYRICS VIEW — Apple Music 스타일 보강
-   · 현재 줄은 정중앙이 아닌 위쪽(app.js 의 LV_ANCHOR)에 정렬되므로, 위쪽 페이드 구간을 줄여
-     위에 남는 지난 줄이 과하게 지워지지 않게 한다.
-   · 재생 UI(.np-lv-bottom)는 일정 시간 상호작용이 없으면 #np-lv.ui-hide 로 부드럽게 사라진다.
-     opacity/transform 만 사용 (레이아웃 영향 없음). 숨김 중에는 터치를 받지 않아 탭이 뒤로 전달된다.
+   · 재생 UI(.np-lv-bottom)는 가사 위에 겹쳐 놓는 오버레이다. 가사 영역이 화면 맨 아래까지 이어지므로
+     UI 가 숨겨졌을 때 그 자리에도 가사가 보인다.
+   · UI 뒤의 하단 어둠(글로우)은 작게: 컨트롤이 읽힐 만큼만.
+   · 숨김/표시는 opacity/transform 만 사용 (레이아웃 영향 없음). 숨김 중에는 터치를 받지 않는다.
 ════════════════════════════════════════════════════════════════════ */
 .np-lv-scroll {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 88%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 94%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 9%, black 94%, transparent 100%);
 }
 .np-lv-bottom {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    z-index: 6;
+    will-change: opacity, transform;
     transition:
-        opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-        transform 0.45s cubic-bezier(0.22, 0.85, 0.28, 1);
+        opacity 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.np-lv-bottom::before {                 /* 하단 글로우(어둠) — 작게 */
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    top: -14px;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.26));
 }
 .np-lv.ui-hide .np-lv-bottom {
     opacity: 0;
-    transform: translate3d(0, 12px, 0);
+    transform: translate3d(0, 8px, 0);
     pointer-events: none;
     transition:
-        opacity 0.8s cubic-bezier(0.4, 0, 0.6, 1),
-        transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+        opacity 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+        transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
     .np-lv-bottom, .np-lv.ui-hide .np-lv-bottom { transition: none !important; }
